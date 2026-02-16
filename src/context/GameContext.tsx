@@ -1,8 +1,9 @@
+
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
-import { Player, GameDuration, GameStatus, GameContextType, Instruction } from '../types';
+import { Player, GameDuration, GameStatus, GameContextType, Instruction, TurnPhase, GameVariant } from '../types';
 import { DEFAULT_PLAYERS } from '../constants';
 import { generateInstruction } from '../utils/instructionLogic';
-import { generateExperimentalInstruction } from '../utils/experimentalLogic'; // NEW IMPORT
+import { generateExperimentalInstruction } from '../utils/experimentalLogic';
 import { calculateTurnTime } from '../utils/timerLogic';
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -13,7 +14,7 @@ const AUDIO_ASSETS = {
   TIMEOUT_FAIL: '/sounds/fail.mp3', 
   CELEBRATION: '/sounds/Success.mp3', 
   GAME_OVER: '/sounds/klaxon.mp3?raw=true', 
-  COUNTDOWN: '/sounds/10-second-countdown.mp3' // Ensure this matches your file name
+  COUNTDOWN: '/sounds/10-second-countdown.mp3'
 };
 
 export const useGameContext = () => {
@@ -32,9 +33,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   // --- Global Settings State ---
   const [settings, setSettings] = useState({
     voiceEnabled: true,
-    soundEnabled: true, // Master switch
-    easyMode: false,    // +10 seconds
-    gameMode: 'A' as 'A' | 'B' | 'C' | 'D', // NEW: Track the active game mode
+    soundEnabled: true,
+    easyMode: false,
+    gameVariant: 'A' as GameVariant,
   });
 
   const updateSettings = (newSettings: Partial<typeof settings>) => {
@@ -44,9 +45,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [players, setPlayers] = useState<Player[]>(DEFAULT_PLAYERS);
   const [duration, setDuration] = useState<GameDuration>(10);
   const [gameStatus, setGameStatus] = useState<GameStatus>('setup');
-  const [turnHistory, setTurnHistory] = useState<string[]>([]);
+  
+  // Scoring & History
+  const [turnHistory, setTurnHistory] = useState<string[]>([]); // Player IDs
   const [activePlayer, setActivePlayer] = useState<Player | null>(null);
   const [winningPlayer, setWinningPlayer] = useState<Player | null>(null);
+  const [scores, setScores] = useState<Record<string, number>>({});
 
   // --- Timer & Logic State ---
   const [gameTimeRemaining, setGameTimeRemaining] = useState<number>(duration * 60);
@@ -55,18 +59,14 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const [isGamePaused, setIsGamePaused] = useState<boolean>(true);
   
   // --- Turn Logic State ---
-  const [isTurnActive, setIsTurnActive] = useState<boolean>(false);
-  const [isTurnTimedOut, setIsTurnTimedOut] = useState<boolean>(false);
+  const [turnPhase, setTurnPhase] = useState<TurnPhase>('ready');
   const [currentInstruction, setCurrentInstruction] = useState<Instruction | null>(null);
-  const [instructionHistory, setInstructionHistory] = useState<Instruction[]>([]);
-  const [isGameInitialized, setIsGameInitialized] = useState<boolean>(false);
+  const [totalTurns, setTotalTurns] = useState<number>(0);
 
   // Refs
   const turnTimeRef = useRef(turnTimeRemaining);
   const gameTimeRef = useRef(gameTimeRemaining);
   const audioCache = useRef<Record<string, HTMLAudioElement>>({});
-  
-  // Specific ref to control the countdown audio
   const countdownAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => { turnTimeRef.current = turnTimeRemaining; }, [turnTimeRemaining]);
@@ -76,32 +76,30 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   useEffect(() => {
     if (gameStatus === 'setup') {
       setGameTimeRemaining(duration * 60);
+      // Reset Scores
+      const initialScores: Record<string, number> = {};
+      players.forEach(p => initialScores[p.id] = 0);
+      setScores(initialScores);
     }
-  }, [duration, gameStatus]);
+  }, [duration, gameStatus, players]);
 
-  // --- Audio Preloading & Helper ---
+  // --- Audio Preloading ---
   useEffect(() => {
     Object.entries(AUDIO_ASSETS).forEach(([key, src]) => {
       const audio = new Audio(src);
       audio.preload = 'auto';
       audio.load();
       audioCache.current[src] = audio;
-
-      if (key === 'COUNTDOWN') {
-        countdownAudioRef.current = audio;
-      }
+      if (key === 'COUNTDOWN') countdownAudioRef.current = audio;
     });
   }, []);
 
   const playSound = useCallback((src: string) => {
     if (!settings.soundEnabled) return;
-
     const audio = audioCache.current[src];
     if (audio) {
       const clone = audio.cloneNode() as HTMLAudioElement;
       clone.play().catch(err => console.warn("Audio clone playback warning:", err));
-    } else {
-      new Audio(src).play().catch(err => console.warn("Fallback playback warning:", err));
     }
   }, [settings.soundEnabled]);
 
@@ -112,198 +110,249 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // --- Fairness & Player Selection ---
-  const calculateNextPlayer = useCallback((currentPlayers: Player[], currentHistory: string[]) => {
+  // --- Player Selection ---
+  const selectNextPlayerId = useCallback((historyOverride?: string[]) => {
+    const historyToUse = historyOverride || turnHistory;
+    
+    // Simple fairness: who has played the least?
     const turnCounts: Record<string, number> = {};
-    currentPlayers.forEach(p => turnCounts[p.id] = 0);
-    currentHistory.forEach(id => {
-      if (turnCounts[id] !== undefined) turnCounts[id]++;
+    players.forEach(p => turnCounts[p.id] = 0);
+    historyToUse.forEach(id => {
+        if (turnCounts[id] !== undefined) turnCounts[id]++;
     });
 
     const minTurns = Math.min(...Object.values(turnCounts));
+    
+    // Candidates are players with minTurns, excluding the person who just went (unless 1 player)
+    let candidates = players.filter(p => turnCounts[p.id] === minTurns);
+    
+    // If everyone is equal, allow anyone (except previous if possible)
+    if (candidates.length === 0) candidates = players;
 
-    let candidates = currentPlayers.filter(p => {
-      if (currentHistory.length >= 2) {
-        const last = currentHistory[currentHistory.length - 1];
-        const secondLast = currentHistory[currentHistory.length - 2];
-        if (last === p.id && secondLast === p.id) return false;
-      }
-      const projectedCount = turnCounts[p.id] + 1;
-      return (projectedCount - minTurns <= 2);
-    });
+    // Avoid back-to-back if possible
+    if (players.length > 1 && historyToUse.length > 0) {
+        const lastId = historyToUse[historyToUse.length - 1];
+        const filtered = candidates.filter(p => p.id !== lastId);
+        if (filtered.length > 0) candidates = filtered;
+    }
 
-    if (candidates.length === 0) candidates = currentPlayers;
     const randomIndex = Math.floor(Math.random() * candidates.length);
-    return candidates[randomIndex];
-  }, []);
-
-  const selectNextPlayerId = useCallback((historyOverride?: string[]) => {
-    const historyToUse = historyOverride || turnHistory;
-    const next = calculateNextPlayer(players, historyToUse);
+    const next = candidates[randomIndex];
+    
     if (next) {
       setActivePlayer(next);
       return next.id;
     }
     return null;
-  }, [players, turnHistory, calculateNextPlayer]);
+  }, [players, turnHistory]);
 
   const nextPlayer = useCallback(() => { selectNextPlayerId(); }, [selectNextPlayerId]);
 
   // --- Timer Controls ---
   const startGameTimer = useCallback(() => setIsGamePaused(false), []);
-  
   const pauseTimer = useCallback(() => {
     stopCountdownAudio(); 
     setIsGamePaused(true);
   }, [stopCountdownAudio]);
 
-  // --- Initialization Effect ---
+  // --- Game State Management ---
   useEffect(() => {
-    if (gameStatus === 'playing' && !isGameInitialized) {
-      setGameTimeRemaining(duration * 60);
-      setIsGamePaused(true);
-      setIsTurnActive(false);
-      setIsTurnTimedOut(false);
-      setStacksExist(false);
-      setInstructionHistory([]);
-      setTurnHistory([]);
-      selectNextPlayerId([]);
-      setIsGameInitialized(true);
-    } else if (gameStatus === 'setup') {
-      setIsGamePaused(true);
-      setIsGameInitialized(false);
+    if (gameStatus === 'playing' && turnPhase === 'ready') {
+       // Just starting a game session
+       if (totalTurns === 0) {
+         setGameTimeRemaining(duration * 60);
+         // Reset scores again to be safe
+         const initialScores: Record<string, number> = {};
+         players.forEach(p => initialScores[p.id] = 0);
+         setScores(initialScores);
+         selectNextPlayerId([]);
+       }
     }
-  }, [gameStatus, selectNextPlayerId, isGameInitialized, duration]);
+  }, [gameStatus, turnPhase, duration, players, totalTurns, selectNextPlayerId]);
+
 
   // --- Turn Logic ---
-  const endTurnRef = useRef<((reason?: any) => void) | null>(null);
 
-  const endTurn = useCallback((reason?: any) => {
-    stopCountdownAudio(); 
-    
-    const isManual = reason && reason.type === 'click';
-    if (isManual) playSound(AUDIO_ASSETS.CELEBRATION);
-
-    pauseTimer();
-
-    let newHistory = [...turnHistory];
-    if (activePlayer) {
-      newHistory.push(activePlayer.id);
-      setTurnHistory(newHistory);
-    }
-    
-    if (currentInstruction) {
-      setInstructionHistory(prev => [...prev, currentInstruction]);
-      if (currentInstruction.type === 'KNOCK') setStacksExist(false);
-      else if (currentInstruction.type === 'NEW') setStacksExist(true);
-    }
-
-    setCurrentInstruction(null);
-    setTurnTimeRemaining(0);
-    setIsTurnActive(false);
-    setIsTurnTimedOut(false);
-    selectNextPlayerId(newHistory);
-  }, [activePlayer, turnHistory, currentInstruction, pauseTimer, selectNextPlayerId, playSound, stopCountdownAudio]);
-
-  useEffect(() => { endTurnRef.current = endTurn; }, [endTurn]);
-
-  // FIX: Updated startTurn with "Smart Seek" logic for short turns
+  // 1. Start Turn
   const startTurn = useCallback(() => {
     if (!activePlayer) return;
 
     playSound(AUDIO_ASSETS.START_TURN);
-    startGameTimer();
+    setIsGamePaused(false); // Game timer runs during instruction
 
-    // 1. Logic Selection (Game Mode)
+    // Generate Instruction
+    const progress = 1 - (gameTimeRef.current / (duration * 60));
     let instr: Instruction;
-    if (settings.gameMode === 'B') {
-      instr = generateExperimentalInstruction(instructionHistory, stacksExist);
+    if (settings.gameVariant === 'B') {
+      instr = generateExperimentalInstruction(totalTurns, progress);
     } else {
-      instr = generateInstruction(instructionHistory, stacksExist);
+      instr = generateInstruction(totalTurns, progress);
     }
 
     setCurrentInstruction(instr);
 
-    // 2. Calculate Time
-    const timePercentage = (gameTimeRemaining / (duration * 60)) * 100;
-    let time = calculateTurnTime(instr.pieces, instructionHistory.length, timePercentage);
+    // Calculate Time
+    const time = calculateTurnTime(instr.type, instr.pieces);
+    setTurnTimeRemaining(time);
     
-    // Easy Mode Logic
-    if (settings.easyMode) {
-      time += 10; 
-    }
+    setTurnPhase('playing'); // Visible timer starts, game timer continues
 
-    const finalTime = Math.round(time);
-    setTurnTimeRemaining(finalTime);
-    setIsTurnActive(true);
-    setIsTurnTimedOut(false);
-
-    // 3. IMMEDIATE AUDIO CHECK
-    // If the turn is 10s or less, we play audio immediately with an offset.
-    // e.g. If time is 4s, we skip the first 6s of the audio file.
-    if (finalTime <= 10 && settings.soundEnabled && countdownAudioRef.current) {
-        const offset = 10 - finalTime; 
-        
-        // Safety check to ensure we don't seek past the end
+    // Audio cue for short turns
+    if (time <= 10 && settings.soundEnabled && countdownAudioRef.current) {
+        const offset = 10 - time; 
         if (offset >= 0 && offset < 10) {
             countdownAudioRef.current.currentTime = offset;
-            countdownAudioRef.current.play().catch(e => console.warn("Audio play failed", e));
+            countdownAudioRef.current.play().catch(e => console.warn(e));
         }
     }
 
-  }, [startGameTimer, instructionHistory, stacksExist, gameTimeRemaining, duration, activePlayer, playSound, settings.easyMode, settings.gameMode, settings.soundEnabled]);
+  }, [activePlayer, duration, totalTurns, playSound, settings.gameVariant, settings.soundEnabled]);
 
-  const acknowledgeTimeout = useCallback(() => {
-    stopCountdownAudio(); 
-    setIsTurnTimedOut(false);
-    endTurnRef.current?.();
-  }, [stopCountdownAudio]);
 
-  // --- Timer Interval ---
+  // 2. End Turn (Manual or Timeout)
+  const endTurn = useCallback((reason: 'manual' | 'timeout' = 'manual') => {
+    stopCountdownAudio();
+    setIsGamePaused(true); // Game timer PAUSES when checking turn
+
+    if (reason === 'timeout') {
+      playSound(AUDIO_ASSETS.TIMEOUT_FAIL);
+      setTurnPhase('timeout');
+      // Timeout Penalty applied immediately in confirmation step or here? 
+      // Rules say: "The player must remove their highest placed animal..."
+      // We wait for user acknowledgement in the UI before proceeding to next player.
+    } else {
+      // Manual finish
+      // Show "Did anything fall?" screen
+      setTurnPhase('checking');
+    }
+
+  }, [stopCountdownAudio, playSound]);
+
+
+  // 3. Confirm Turn Result (Called from UI)
+  const confirmTurnResult = useCallback((fell: boolean) => {
+    if (!activePlayer) return;
+
+    let pointsChange = 0;
+    const isTimeout = turnPhase === 'timeout';
+
+    if (isTimeout) {
+        // Rule: Turn Failure (Timeout): Score -= 5.
+        pointsChange = -5;
+    } else if (fell) {
+        // Rule: Turn Failure (Fall): Score -= 10.
+        pointsChange = -10;
+        playSound(AUDIO_ASSETS.TIMEOUT_FAIL); // Fall sound (Fail)
+    } else {
+        // Success (Manual + No Fall)
+        // Rule: Score += (SecondsRemaining * 1).
+        // Note: Move/Remove/Fox cards -> remaining time does not convert to points.
+        if (currentInstruction && currentInstruction.type === 'BUILD') {
+            pointsChange = turnTimeRef.current;
+        } else {
+            pointsChange = 0; 
+        }
+        playSound(AUDIO_ASSETS.CELEBRATION);
+    }
+
+    // Update Score
+    setScores(prev => ({
+        ...prev,
+        [activePlayer.id]: (prev[activePlayer.id] || 0) + pointsChange
+    }));
+
+    // Update History
+    const newHistory = [...turnHistory, activePlayer.id];
+    setTurnHistory(newHistory);
+    setTotalTurns(prev => prev + 1);
+
+    // Prepare next
+    setCurrentInstruction(null);
+    setTurnPhase('ready');
+    selectNextPlayerId(newHistory);
+
+  }, [activePlayer, turnPhase, turnHistory, currentInstruction, playSound, selectNextPlayerId]);
+
+
+  // 4. Highest Animal Bonus
+  const addHighestAnimalBonus = useCallback((playerIds: string[]) => {
+      setScores(prev => {
+          const newScores = { ...prev };
+          playerIds.forEach(id => {
+              if (newScores[id] !== undefined) {
+                  newScores[id] += 50;
+              }
+          });
+          return newScores;
+      });
+
+      // Calculate Winner based on scores
+      const sorted = [...players].sort((a, b) => {
+         const scoreA = scores[a.id] + (playerIds.includes(a.id) ? 50 : 0); // Include bonus in calc just in case state update is slow
+         const scoreB = scores[b.id] + (playerIds.includes(b.id) ? 50 : 0);
+         return scoreB - scoreA;
+      });
+
+      setWinningPlayer(sorted[0]);
+      setGameStatus('winner');
+  }, [players, scores]);
+
+
+  // --- Timers ---
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
 
     if (gameStatus === 'playing') {
       interval = setInterval(() => {
+        
+        // 1. Game Timer (Only runs if not paused)
         if (!isGamePaused) {
           const currentGameTime = gameTimeRef.current;
           if (currentGameTime <= 1) {
-            setGameTimeRemaining(0);
-            setGameStatus('finished');
-            setIsGamePaused(true);
-            playSound(AUDIO_ASSETS.GAME_OVER);
-            return;
+             // GAME OVER
+             setGameTimeRemaining(0);
+             stopCountdownAudio();
+             playSound(AUDIO_ASSETS.GAME_OVER);
+             setIsGamePaused(true);
+             // Any turn in play is cancelled immediately. No points/penalties.
+             setTurnPhase('ready');
+             setGameStatus('game_over_selection');
+             
+             // Speech
+             const synth = window.speechSynthesis;
+             if (synth && settings.voiceEnabled) {
+                 const u = new SpeechSynthesisUtterance("Stop what you're doing, it's game over! Who's got the highest animal?");
+                 synth.speak(u);
+             }
+             return;
           } else {
             setGameTimeRemaining(currentGameTime - 1);
           }
         }
 
-        if (isTurnActive) {
+        // 2. Turn Timer (Only runs during 'playing' phase)
+        if (turnPhase === 'playing') {
           const currentTime = turnTimeRef.current;
           const nextTime = currentTime - 1;
           
-          if (nextTime <= 0) {
-            stopCountdownAudio(); 
-            playSound(AUDIO_ASSETS.TIMEOUT_FAIL);
-            setIsTurnActive(false); 
-            pauseTimer();
-            setIsTurnTimedOut(true);
-            return;
+          if (nextTime < 0) {
+             // Timeout logic triggered inside interval to catch it exactly
+             endTurn('timeout');
           } else {
-            setTurnTimeRemaining(nextTime);
-            
-            // Play countdown sound ONLY if we tick exactly onto 10
-            // (The startTurn logic handles cases where we start below 10)
-            if (nextTime === 10 && settings.soundEnabled) {
-               countdownAudioRef.current?.play().catch(e => console.warn(e));
-            }
+             setTurnTimeRemaining(nextTime);
+             // 10s warning
+             if (nextTime === 10 && settings.soundEnabled) {
+                countdownAudioRef.current?.play().catch(e => console.warn(e));
+             }
           }
         }
+
       }, 1000);
     }
 
     return () => { if (interval) clearInterval(interval); };
-  }, [gameStatus, isGamePaused, isTurnActive, playSound, pauseTimer, settings.soundEnabled, stopCountdownAudio]);
+  }, [gameStatus, isGamePaused, turnPhase, playSound, settings.soundEnabled, settings.voiceEnabled, endTurn, stopCountdownAudio]);
+
 
   return (
     <GameContext.Provider
@@ -313,13 +362,14 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         gameStatus, setGameStatus,
         activePlayer, nextPlayer,
         turnHistory, winningPlayer, setWinningPlayer,
+        scores, addHighestAnimalBonus,
         gameTimeRemaining, turnTimeRemaining, setTurnTimeRemaining,
         stacksExist, setStacksExist,
-        isGamePaused, isTurnActive, isTurnTimedOut,
-        currentInstruction,
-        startTurn, endTurn, acknowledgeTimeout,
+        isGamePaused, 
+        turnPhase, currentInstruction,
+        startTurn, endTurn, confirmTurnResult,
         startGameTimer, pauseTimer,
-        settings, updateSettings // New settings exported here
+        settings, updateSettings
       }}
     >
       {children}

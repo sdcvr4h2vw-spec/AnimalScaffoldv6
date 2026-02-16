@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { SplashScreen } from './components/SplashScreen';
 import { PlayerSetupScreen } from './components/PlayerSetupScreen';
@@ -5,7 +6,7 @@ import { GameLengthScreen } from './components/GameLengthScreen';
 import { GameScreen } from './components/GameScreen';
 import { GameOverScreen } from './components/GameOverScreen';
 import { WinnerScreen } from './components/WinnerScreen';
-import { SettingsScreen } from './components/SettingsScreen'; // <--- IMPORT ADDED
+import { SettingsScreen } from './components/SettingsScreen';
 import { Player, GameDuration, ScreenState } from './types';
 import { GameProvider, useGameContext } from './context/GameContext';
 
@@ -49,17 +50,16 @@ const AppContent: React.FC = () => {
 
   // --- Render Logic ---
 
-  // 1. Check for Settings Screen
   if (gameStatus === 'settings') {
     return <SettingsScreen />;
   }
 
-  // 2. Check for Active Game States
   if (gameStatus === 'playing') {
     return <GameScreen />;
   }
   
-  if (gameStatus === 'finished') {
+  // New Status: Selecting the highest animal before showing winner
+  if (gameStatus === 'game_over_selection') {
      return <GameOverScreen />;
   }
 
@@ -67,7 +67,7 @@ const AppContent: React.FC = () => {
     return <WinnerScreen onNewGame={handleNewGame} onRematch={handleRematch} />;
   }
 
-  // 3. Default: Setup Flow (Splash -> Players -> Length)
+  // Default: Setup Flow
   return (
     <>
       {currentSetupScreen === 'splash' && (

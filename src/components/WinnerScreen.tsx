@@ -1,8 +1,8 @@
+
 import React from 'react';
 import { useGameContext } from '../context/GameContext';
 import { Button } from './Button';
-import { ASSETS } from '../constants';
-import { Volume2, Power } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 
 interface WinnerScreenProps {
   onNewGame: () => void;
@@ -10,54 +10,55 @@ interface WinnerScreenProps {
 }
 
 export const WinnerScreen: React.FC<WinnerScreenProps> = ({ onNewGame, onRematch }) => {
-  const { winningPlayer } = useGameContext();
+  const { winningPlayer, players, scores } = useGameContext();
+
+  // Sort players by score for the list
+  const sortedPlayers = [...players].sort((a, b) => (scores[b.id] || 0) - (scores[a.id] || 0));
 
   return (
-    <div className="h-full w-full flex flex-col bg-scaffold-yellow text-scaffold-red animate-fade-in">
+    <div className="h-full w-full flex flex-col p-6 bg-scaffold-cream overflow-y-auto animate-fade-in">
       
-      {/* Minimal Header */}
-      <div className="px-6 pt-6 flex justify-between items-center z-10">
-         <div className="text-scaffold-red/60 hover:text-scaffold-red">
-            <Volume2 size={24} />
-         </div>
-         <button 
-           onClick={onNewGame}
-           className="text-scaffold-red/60 hover:text-scaffold-red font-bold text-sm uppercase flex items-center gap-1"
-         >
-           Quit
-         </button>
-      </div>
-
-      <div className="flex-1 px-6 flex flex-col items-center justify-center -mt-10">
-        
-        <div className="w-32 mb-6 animate-bounce-slow">
-           <img 
-             src={ASSETS.TROPHY} 
-             alt="Trophy" 
-             className="w-full h-auto drop-shadow-xl"
-           />
+      <div className="flex-1 flex flex-col items-center pt-8">
+        <div className="bg-yellow-400 p-6 rounded-full mb-6 shadow-xl animate-bounce">
+          <Trophy size={48} className="text-yellow-900" />
         </div>
-
-        <h2 className="text-5xl font-black text-center mb-2 leading-tight drop-shadow-sm">
-          {winningPlayer?.name}
-        </h2>
         
-        <p className="text-3xl font-bold text-center mb-8">
-          Congratulations!
-        </p>
+        <h2 className="text-xl font-bold text-scaffold-red uppercase tracking-widest mb-2">Winner</h2>
+        <h1 className="text-5xl font-black text-gray-800 text-center mb-12 drop-shadow-sm leading-tight">
+          Congratulations<br/>
+          <span className="text-scaffold-red">{winningPlayer?.name}</span>
+        </h1>
+
+        {/* Scoreboard */}
+        <div className="w-full bg-white rounded-2xl p-6 shadow-sm mb-8">
+           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 border-b pb-2">Final Scores</h3>
+           <div className="space-y-3">
+             {sortedPlayers.map((p, index) => (
+               <div key={p.id} className="flex justify-between items-center">
+                 <div className="flex items-center gap-3">
+                   <span className={`font-mono font-bold w-6 text-center ${index === 0 ? 'text-yellow-500' : 'text-gray-400'}`}>
+                     {index + 1}
+                   </span>
+                   <span className={`font-bold text-lg ${index === 0 ? 'text-gray-900' : 'text-gray-600'}`}>
+                     {p.name}
+                   </span>
+                 </div>
+                 <span className="font-mono font-bold text-xl text-scaffold-red">
+                   {scores[p.id] || 0}
+                 </span>
+               </div>
+             ))}
+           </div>
+        </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="p-6 flex flex-col gap-3 max-w-sm mx-auto w-full mb-4">
-        <Button variant="primary" fullWidth onClick={onRematch} className="py-5 text-xl">
-          Rematch!
+      <div className="space-y-4 mt-auto pt-6">
+        <Button onClick={onRematch} variant="primary" fullWidth className="py-4 text-xl shadow-lg">
+          Rematch
         </Button>
-        <button 
-          onClick={onNewGame}
-          className="text-scaffold-red/60 font-bold hover:text-scaffold-red hover:bg-black/5 py-3 rounded-lg transition-colors uppercase tracking-wider text-sm"
-        >
+        <Button onClick={onNewGame} variant="ghost" fullWidth>
           New Game
-        </button>
+        </Button>
       </div>
     </div>
   );

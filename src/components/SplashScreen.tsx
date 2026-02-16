@@ -1,59 +1,38 @@
+
 import React from 'react';
-import { ASSETS } from '../constants';
 import { Button } from './Button';
-import { Settings } from 'lucide-react';
-// 1. IMPORT THE HOOK HERE
-import { useGameContext } from '../context/GameContext';
 
 interface SplashScreenProps {
   onPlay: () => void;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onPlay }) => {
-  // 2. CALL THE HOOK HERE (Inside the component, before return)
-  const { setGameStatus } = useGameContext();
-
   return (
-    <div className="relative h-full w-full flex flex-col items-center justify-between bg-gradient-to-b from-orange-400 via-pink-500 to-purple-900 overflow-hidden">
+    <div className="h-full w-full flex flex-col items-center justify-between p-8 bg-scaffold-red animate-fade-in relative overflow-hidden">
       
-      {/* Settings Icon - Now Functional! */}
-      <div 
-        className="absolute top-6 right-6 z-20 text-white/80 cursor-pointer hover:text-white"
-        onClick={() => setGameStatus('settings')}
-      >
-        <Settings size={28} />
-      </div>
+      {/* Decorative Circles */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[30%] bg-white/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-20%] w-[60%] h-[40%] bg-black/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Cityscape Background Layer */}
-      <div className="absolute bottom-0 left-0 w-full h-[90%] pointer-events-none z-0">
-        <img
-          src={ASSETS.CITYSCAPE}
-          alt="Cityscape"
-          className="w-full h-full object-cover object-bottom"
-        />
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full px-6 z-10 pt-40">
-        {/* Logo */}
-        <div className="w-64 md:w-80 mb-4 animate-fade-in-down">
-          <img 
-            src={ASSETS.LOGO} 
-            alt="Scaffold Logo" 
-            className="w-full h-auto drop-shadow-lg"
-          />
+      <div className="flex-1 flex flex-col items-center justify-center w-full z-10">
+        <div className="mb-8 p-6 bg-white rounded-[2rem] shadow-2xl rotate-[-3deg] hover:rotate-0 transition-transform duration-500 cursor-pointer">
+           <img 
+             src="https://github.com/sdcvr4h2vw-spec/scaffold_assets/blob/main/animal-scaffold-logo.png?raw=true" 
+             alt="Animal Scaffold Logo" 
+             className="w-48 h-48 object-contain"
+           />
         </div>
-
-        {/* Tagline */}
-        <p className="text-yellow-200 text-center text-lg md:text-xl font-medium max-w-xs drop-shadow-md mb-8">
-          the fast-paced game of <br/>
-          <span className="text-yellow-100 font-bold">bending & balancing</span>
+        
+        <h1 className="text-5xl font-black text-white tracking-tighter text-center leading-tight drop-shadow-md mb-2">
+          ANIMAL<br/>SCAFFOLD
+        </h1>
+        <p className="text-scaffold-cream text-lg font-medium opacity-90 tracking-widest uppercase">
+          Build High. Don't Fall.
         </p>
       </div>
 
-      {/* Action Area */}
-      <div className="w-full px-8 pb-12 z-20">
-        <Button variant="cream" fullWidth onClick={onPlay} className="text-xl">
+      <div className="w-full max-w-sm z-10">
+        <Button onClick={onPlay} variant="cream" fullWidth className="text-2xl py-6 shadow-xl">
           Play
         </Button>
       </div>

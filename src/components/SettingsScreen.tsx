@@ -1,122 +1,120 @@
+
 import React from 'react';
 import { useGameContext } from '../context/GameContext';
 import { Button } from './Button';
-import { ArrowLeft, Check } from 'lucide-react';
+import { Volume2, VolumeX, CheckCircle2, Circle } from 'lucide-react';
 
 export const SettingsScreen: React.FC = () => {
-  const { settings, updateSettings, setGameStatus } = useGameContext();
+  const { setGameStatus, settings, updateSettings } = useGameContext();
 
-  // Helper for the Toggle Switches (Top Section)
-  const ToggleRow = ({ label, value, onChange }: { label: string, value: boolean, onChange: (val: boolean) => void }) => (
-    <div className="flex items-center justify-between bg-white rounded-xl p-4 mb-3 shadow-sm">
-      <span className="text-[#2A4A62] text-lg font-bold">{label}</span>
-      <button 
-        onClick={() => onChange(!value)}
-        className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 relative ${value ? 'bg-[#335c81]' : 'bg-gray-300'}`}
-      >
-        <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 ${value ? 'translate-x-6' : 'translate-x-0'}`} />
-      </button>
-    </div>
-  );
-
-  // Helper for the Game Mode Cards (Bottom Section)
-  const GameModeCard = ({ 
-    mode, 
-    title, 
-    desc, 
-    disabled = false 
-  }: { 
-    mode: 'A' | 'B' | 'C' | 'D', 
-    title: string, 
-    desc: string,
-    disabled?: boolean
-  }) => {
-    const isSelected = settings.gameMode === mode;
-    
-    return (
-      <div 
-        onClick={() => !disabled && updateSettings({ gameMode: mode })}
-        className={`bg-white rounded-xl p-5 mb-3 shadow-sm flex items-start gap-4 transition-all border-2
-          ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'}
-          ${isSelected ? 'border-[#335c81]' : 'border-transparent'}
-        `}
-      >
-        <div className="flex-1">
-          <h3 className="text-[#2A4A62] font-black text-xl mb-1">{title}</h3>
-          <p className="text-slate-500 text-sm font-medium leading-tight">{desc}</p>
-        </div>
-
-        {/* Custom Radio Button / Checkbox UI */}
-        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors
-          ${isSelected ? 'bg-[#335c81] border-[#335c81]' : 'border-slate-300'}
-        `}>
-          {isSelected && <Check size={18} className="text-white" strokeWidth={4} />}
-        </div>
-      </div>
-    );
+  const handleBack = () => {
+    setGameStatus('setup');
   };
 
   return (
-    <div className="h-full w-full bg-[#335c81] flex flex-col p-6 animate-fade-in overflow-y-auto">
-      
-      {/* Header */}
-      <h1 className="text-center text-4xl font-bold text-[#FCEBCB] mb-8 mt-2">
-        Settings
-      </h1>
+    <div className="h-full w-full flex flex-col bg-scaffold-cream overflow-y-auto">
+      <div className="p-6">
+        <h2 className="text-3xl font-black text-scaffold-red mb-8 tracking-tight">Settings</h2>
 
-      {/* Section 1: Toggles */}
-      <div className="bg-[#335c81]/50 rounded-2xl p-2 mb-6 border border-white/10">
-        <ToggleRow 
-          label="Voice instructions" 
-          value={settings.voiceEnabled} 
-          onChange={(v) => updateSettings({ voiceEnabled: v })} 
-        />
-        <ToggleRow 
-          label="Sound" 
-          value={settings.soundEnabled} 
-          onChange={(v) => updateSettings({ soundEnabled: v })} 
-        />
-      </div>
+        {/* Audio Settings */}
+        <section className="mb-8">
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Audio</h3>
+          
+          <div className="space-y-3">
+             <button 
+               onClick={() => updateSettings({ soundEnabled: !settings.soundEnabled })}
+               className="w-full bg-white p-4 rounded-xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"
+             >
+                <div className="flex items-center gap-3">
+                   <div className={`p-2 rounded-lg ${settings.soundEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {settings.soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                   </div>
+                   <span className="font-bold text-gray-700">Sound Effects</span>
+                </div>
+                {settings.soundEnabled ? <CheckCircle2 className="text-green-500" /> : <Circle className="text-gray-300" />}
+             </button>
 
-      {/* Section 2: Game Modes */}
-      <div className="bg-[#335c81]/50 rounded-2xl p-2 border border-white/10 mb-6">
+             <button 
+               onClick={() => updateSettings({ voiceEnabled: !settings.voiceEnabled })}
+               className="w-full bg-white p-4 rounded-xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"
+             >
+                <div className="flex items-center gap-3">
+                   <div className={`p-2 rounded-lg ${settings.voiceEnabled ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {settings.voiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                   </div>
+                   <span className="font-bold text-gray-700">Voice Instructions</span>
+                </div>
+                {settings.voiceEnabled ? <CheckCircle2 className="text-green-500" /> : <Circle className="text-gray-300" />}
+             </button>
+          </div>
+        </section>
+
+        {/* Game Variant Settings */}
+        <section className="mb-8">
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Game Mode</h3>
+          
+          <div className="space-y-3">
+            {/* Game A */}
+            <button 
+               onClick={() => updateSettings({ gameVariant: 'A' })}
+               className={`w-full p-4 rounded-xl shadow-sm flex items-start justify-between text-left border-2 transition-all ${settings.gameVariant === 'A' ? 'bg-white border-scaffold-red' : 'bg-white/50 border-transparent'}`}
+             >
+                <div className="flex-1 pr-4">
+                   <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-scaffold-red text-lg">Game A</span>
+                      {settings.gameVariant === 'A' && <span className="bg-scaffold-red text-white text-[10px] px-2 py-0.5 rounded-full uppercase font-bold">Active</span>}
+                   </div>
+                   <p className="text-sm text-gray-600 leading-snug">
+                     Standard Rules. Whose animal can climb the highest and score the most points?
+                   </p>
+                </div>
+                <div className="mt-1">
+                  {settings.gameVariant === 'A' ? <CheckCircle2 className="text-scaffold-red" /> : <Circle className="text-gray-300" />}
+                </div>
+             </button>
+
+             {/* Game B */}
+             <button 
+               onClick={() => updateSettings({ gameVariant: 'B' })}
+               className={`w-full p-4 rounded-xl shadow-sm flex items-start justify-between text-left border-2 transition-all ${settings.gameVariant === 'B' ? 'bg-white border-scaffold-red' : 'bg-white/50 border-transparent'}`}
+             >
+                <div className="flex-1 pr-4">
+                   <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-gray-800 text-lg">Game B</span>
+                      {settings.gameVariant === 'B' && <span className="bg-scaffold-red text-white text-[10px] px-2 py-0.5 rounded-full uppercase font-bold">Active</span>}
+                   </div>
+                   <p className="text-sm text-gray-600 leading-snug">
+                     Experimental instruction cards (including The Fox).
+                   </p>
+                </div>
+                <div className="mt-1">
+                  {settings.gameVariant === 'B' ? <CheckCircle2 className="text-scaffold-red" /> : <Circle className="text-gray-300" />}
+                </div>
+             </button>
+          </div>
+        </section>
         
-        <GameModeCard 
-          mode="A" 
-          title="Game A" 
-          desc="Follow instructions quickly against the clock" 
-        />
+        {/* Difficulty */}
+        <section className="mb-12">
+           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Difficulty</h3>
+           <button 
+               onClick={() => updateSettings({ easyMode: !settings.easyMode })}
+               className="w-full bg-white p-4 rounded-xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"
+             >
+                <div className="flex-col items-start gap-1">
+                   <span className="font-bold text-gray-700 block">Easy Mode</span>
+                   <span className="text-xs text-gray-500 block">Add +10 seconds to every turn</span>
+                </div>
+                {settings.easyMode ? <CheckCircle2 className="text-green-500" /> : <Circle className="text-gray-300" />}
+             </button>
+        </section>
 
-        <GameModeCard 
-          mode="B" 
-          title="Game B" 
-          desc="Game A but with experimental instruction cards" 
-        />
-
-        <GameModeCard 
-          mode="C" 
-          title="Game C" 
-          desc="No time limit - each game lasts a set number of turns" 
-          disabled // Placeholder
-        />
-
-        <GameModeCard 
-          mode="D" 
-          title="Game D" 
-          desc="Whose animal will be highest when the game ends" 
-          disabled // Placeholder
-        />
       </div>
 
-      {/* Done Button */}
-      <div className="mt-auto pt-4">
-        <Button 
-          variant="cream" 
-          fullWidth 
-          onClick={() => setGameStatus('setup')}
-        >
-          Done
-        </Button>
+      <div className="mt-auto p-6 bg-white border-t border-gray-100">
+         <Button onClick={handleBack} fullWidth>
+           Save & Back
+         </Button>
       </div>
     </div>
   );

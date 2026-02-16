@@ -1,176 +1,115 @@
+
 import { Instruction, InstructionType } from '../types';
-
-// The orientations allowed. Empty string represents "any orientation"
-const ORIENTATIONS = [
-  'horizontally',
-  'vertically',
-  '', 
-];
-
-// Helper to pluralize piece text
-const getPieceText = (count: number): string => {
-  return count === 1 ? 'piece' : 'pieces';
-};
 
 // Helper to get a random integer between min and max (inclusive)
 const getRandomInt = (min: number, max: number): number => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-// Helper to get a random orientation
+// --- RANDOMIZER HELPERS ---
+
 const getRandomOrientation = (): string => {
-  return ORIENTATIONS[Math.floor(Math.random() * ORIENTATIONS.length)];
+  const rand = Math.random();
+  if (rand < 0.30) return 'horizontally';
+  if (rand < 0.60) return 'vertically';
+  return ''; // 40% blank (player choice)
 };
 
-/**
- * Helper to construct the instruction object based on type
- */
-const createInstruction = (type: InstructionType, history: Instruction[]): Instruction => {
-  switch (type) {
-    case 'NEW': {
-      // Rule A: Create a new scaffold using [2-6] pieces.
-      // CHANGE: Increased pieces to 2-6
-      // CHANGE: "Stack" -> "scaffold"
-      const pieces = getRandomInt(2, 6); 
-      return {
-        type: 'NEW',
-        pieces,
-        orientation: '',
-        text: `Create a new scaffold using ${pieces} ${getPieceText(pieces)}`
-      };
-    }
-    case 'ADD': {
-      // Rule B: Place [1-3] pieces.
-      const pieces = getRandomInt(1, 3);
-      const orientation = getRandomOrientation();
-      
-      // Build the text based on orientation
-      let orientationText = "on top of any existing scaffold";
-      if (orientation) {
-        orientationText = `${orientation} ${orientationText}`;
-      }
-      
-      return {
-        type: 'ADD',
-        pieces,
-        orientation,
-        // FIXED: Ends with a backtick now
-        text: `Place ${pieces} ${getPieceText(pieces)} ${orientationText}.`,
-        // FIXED: Starts and ends with backticks
-        secondaryText: `If there are no scaffolds, start a new one.`
-      };
-    }
-    case 'KNOCK': {
-      // DEPRECATED: This case is technically unreachable now based on weights,
-      // but kept for type safety or future re-enabling.
-      return {
-        type: 'KNOCK',
-        pieces: 0, 
-        orientation: '',
-        text: 'Knock down any scaffold.'
-      };
-    }
-    case 'REMOVE': {
-      // Rule C: Remove up to 3 pieces.
-      // CHANGE: User chooses number (up to 3).
-      // CHANGE: Handles "no scaffolds" scenario.
-      const pieces = 3; // Max pieces for reference
-      return {
-        type: 'REMOVE',
-        pieces,
-        orientation: '',
-        // Main instruction (Large text)
-        text: `Remove up to 3 pieces from any scaffold to give to other players.`,
-        // Secondary instruction (Small text)
-        secondaryText: `Keep up to 2 pieces if any fall. If there are no scaffolds, take one piece.`
-      };
-    }
+const getRandomPlacement = (): string => {
+  const rand = Math.random();
+  if (rand < 0.10) return 'on your highest piece';
+  return 'on a different piece'; // 90%
+};
+
+// --- CARD GENERATORS ---
+
+const createBuildInstruction = (): Instruction => {
+  const pieces = getRandomInt(1, 4);
+  const orientation = getRandomOrientation();
+  
+  let text = `Build using ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}`;
+  if (orientation) {
+    text += ` positioned ${orientation}`;
   }
+
+  return {
+    type: 'BUILD',
+    pieces,
+    text,
+    secondaryText: 'You may choose to play animals as pieces',
+    orientation
+  };
+};
+
+const createMoveInstruction = (): Instruction => {
+  const count = getRandomInt(1, 2);
+  const orientation = getRandomOrientation();
+  const placement = getRandomPlacement();
+
+  let text = `Move ${count} of your animals`;
+  if (orientation) text += ` positioning ${count === 1 ? 'it' : 'them'} ${orientation}`;
+  text += `, placing ${count === 1 ? 'it' : 'them'} ${placement}`;
+
+  return {
+    type: 'MOVE',
+    pieces: 1, // Logic treats as 1 piece for timer, but we hardcode 15s anyway
+    text,
+    secondaryText: 'If all your animals are in the pen, place a new one on a scaffold'
+  };
+};
+
+const createRemoveInstruction = (): Instruction => {
+  return {
+    type: 'REMOVE',
+    pieces: 1,
+    text: 'Take one of your animals back to the pen.',
+    secondaryText: 'If all your animals are in the pen, skip this turn'
+  };
 };
 
 /**
- * Helper to check if a candidate instruction type is currently valid.
- * CHANGE: Removed most constraints to make game more fluid.
- */
-const isInstructionValid = (
-    type: InstructionType, 
-    turnCount: number, 
-    history: Instruction[]
-): boolean => {
-    switch (type) {
-        case 'ADD':
-            return true; 
-        
-        case 'NEW':
-             // CHANGE: Removed the "last 5 turns" constraint so it is more common.
-            return true;
-
-        case 'KNOCK':
-            // Rule: Removed from game
-            return false;
-
-        case 'REMOVE':
-            // CHANGE: Removed turn constraints to cater for "no scaffolds" logic.
-            return true;
-
-        default:
-            return false;
-    }
-};
-
-/**
- * Generates a single instruction based on game history and state.
- * @param instructionHistory - Array of past instructions
- * @param stacksExist - Boolean indicating if there are currently stacks on the table
+ * Generates a single instruction for Game Variant A.
+ * @param turnCount - Current total turns taken
+ * @param gameProgress - 0.0 to 1.0 representing percentage of game complete
  */
 export const generateInstruction = (
-  instructionHistory: Instruction[],
-  stacksExist: boolean
+  turnCount: number,
+  gameProgress: number
 ): Instruction => {
-  const turnCount = instructionHistory.length + 1;
 
-  // --- Rule: Turn 1 ---
-  // We still force NEW on the very first turn to get the game going.
-  // CHANGE: We removed the `|| !stacksExist` check here. 
-  // Now, even if no stacks exist later in the game, ADD or REMOVE can still appear
-  // because their text now handles that scenario.
-  if (turnCount === 1) {
-    return createInstruction('NEW', instructionHistory);
+  // Eligibility Check
+  const options: { type: InstructionType; weight: number }[] = [];
+
+  // 1. BUILD: Always available. Base Weight 70.
+  options.push({ type: 'BUILD', weight: 70 });
+
+  // 2. MOVE: Available after 3 turns. Base Weight 20.
+  if (turnCount >= 3) {
+    options.push({ type: 'MOVE', weight: 20 });
   }
 
-  // --- Weighted Selection ---
-  // CHANGE: Weights updated to ADD (90), NEW (10), REMOVE (0)
-  // KNOCK removed.
-  const weights = [
-      { type: 'ADD' as InstructionType, weight: 85 },
-      { type: 'NEW' as InstructionType, weight: 15 },
-      { type: 'REMOVE' as InstructionType, weight: 0 },
-  ];
-  
-  let attempts = 0;
-  
-  while (attempts < 20) {
-    attempts++;
-    const rand = Math.random() * 100;
-    let cumulative = 0;
-    
-    let candidateType: InstructionType = 'ADD';
-
-    // Select candidate based on weights
-    for (const option of weights) {
-        cumulative += option.weight;
-        if (rand < cumulative) {
-            candidateType = option.type;
-            break;
-        }
-    }
-
-    // --- Check Constraints ---
-    if (isInstructionValid(candidateType, turnCount, instructionHistory)) {
-        return createInstruction(candidateType, instructionHistory);
-    }
+  // 3. REMOVE: Available after 50% time. Base Weight 10.
+  if (gameProgress > 0.5) {
+    options.push({ type: 'REMOVE', weight: 10 });
   }
 
-  // Fallback
-  return createInstruction('ADD', instructionHistory);
+  // Select based on weights
+  const totalWeight = options.reduce((sum, opt) => sum + opt.weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  let selectedType: InstructionType = 'BUILD';
+  for (const opt of options) {
+    if (random < opt.weight) {
+      selectedType = opt.type;
+      break;
+    }
+    random -= opt.weight;
+  }
+
+  // Create Card
+  switch (selectedType) {
+    case 'MOVE': return createMoveInstruction();
+    case 'REMOVE': return createRemoveInstruction();
+    default: return createBuildInstruction();
+  }
 };
