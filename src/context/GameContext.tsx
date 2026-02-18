@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { Player, GameDuration, GameStatus, GameContextType, Instruction, TurnPhase, GameVariant } from '../types';
 import { DEFAULT_PLAYERS } from '../constants';
@@ -72,14 +71,25 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   useEffect(() => { turnTimeRef.current = turnTimeRemaining; }, [turnTimeRemaining]);
   useEffect(() => { gameTimeRef.current = gameTimeRemaining; }, [gameTimeRemaining]);
 
-  // Sync gameTimeRemaining when duration changes during setup
+  // --- BUG FIX (Issue 6): Comprehensive Reset Logic ---
+  // This effect ensures that whenever the game goes back to 'setup' (via Rematch or New Game),
+  // all gameplay-specific data is wiped so the next game starts fresh.
   useEffect(() => {
     if (gameStatus === 'setup') {
       setGameTimeRemaining(duration * 60);
+      
       // Reset Scores
       const initialScores: Record<string, number> = {};
       players.forEach(p => initialScores[p.id] = 0);
       setScores(initialScores);
+
+      // Reset turn tracking and winning data
+      setTurnHistory([]);
+      setTotalTurns(0);
+      setWinningPlayer(null);
+      setTurnPhase('ready');
+      setCurrentInstruction(null);
+      setIsGamePaused(true);
     }
   }, [duration, gameStatus, players]);
 
@@ -158,10 +168,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   // --- Game State Management ---
   useEffect(() => {
     if (gameStatus === 'playing' && turnPhase === 'ready') {
-       // Just starting a game session
+       // Initializing the first turn of a session
        if (totalTurns === 0) {
          setGameTimeRemaining(duration * 60);
-         // Reset scores again to be safe
          const initialScores: Record<string, number> = {};
          players.forEach(p => initialScores[p.id] = 0);
          setScores(initialScores);
@@ -217,12 +226,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     if (reason === 'timeout') {
       playSound(AUDIO_ASSETS.TIMEOUT_FAIL);
       setTurnPhase('timeout');
-      // Timeout Penalty applied immediately in confirmation step or here? 
-      // Rules say: "The player must remove their highest placed animal..."
-      // We wait for user acknowledgement in the UI before proceeding to next player.
     } else {
       // Manual finish
-      // Show "Did anything fall?" screen
       setTurnPhase('checking');
     }
 
@@ -237,16 +242,12 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const isTimeout = turnPhase === 'timeout';
 
     if (isTimeout) {
-        // Rule: Turn Failure (Timeout): Score -= 10.
         pointsChange = -10;
     } else if (fell) {
-        // Rule: Turn Failure (Fall): Score -= 10.
         pointsChange = -10;
-        playSound(AUDIO_ASSETS.TIMEOUT_FAIL); // Fall sound (Fail)
+        playSound(AUDIO_ASSETS.TIMEOUT_FAIL); 
     } else {
-        // Success (Manual + No Fall)
-        // Rule: Score += (SecondsRemaining * 1).
-        // Note: Move/Remove/Fox cards -> remaining time does not convert to points.
+        // Success
         if (currentInstruction && currentInstruction.type === 'BUILD') {
             pointsChange = turnTimeRef.current;
         } else {
@@ -286,9 +287,9 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           return newScores;
       });
 
-      // Calculate Winner based on scores
+      // Calculate Winner
       const sorted = [...players].sort((a, b) => {
-         const scoreA = scores[a.id] + (playerIds.includes(a.id) ? 50 : 0); // Include bonus in calc just in case state update is slow
+         const scoreA = scores[a.id] + (playerIds.includes(a.id) ? 50 : 0);
          const scoreB = scores[b.id] + (playerIds.includes(b.id) ? 50 : 0);
          return scoreB - scoreA;
       });
@@ -298,27 +299,24 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   }, [players, scores]);
 
 
-  // --- Timers ---
+  // --- Main Timer Loop ---
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
 
     if (gameStatus === 'playing') {
       interval = setInterval(() => {
         
-        // 1. Game Timer (Only runs if not paused)
+        // 1. Game Timer
         if (!isGamePaused) {
           const currentGameTime = gameTimeRef.current;
           if (currentGameTime <= 1) {
-             // GAME OVER
              setGameTimeRemaining(0);
              stopCountdownAudio();
              playSound(AUDIO_ASSETS.GAME_OVER);
              setIsGamePaused(true);
-             // Any turn in play is cancelled immediately. No points/penalties.
              setTurnPhase('ready');
              setGameStatus('game_over_selection');
              
-             // Speech
              const synth = window.speechSynthesis;
              if (synth && settings.voiceEnabled) {
                  const u = new SpeechSynthesisUtterance("Stop what you're doing, it's game over! Who's got the highest animal?");
@@ -330,17 +328,18 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           }
         }
 
-        // 2. Turn Timer (Only runs during 'playing' phase)
+        // 2. Turn Timer
         if (turnPhase === 'playing') {
           const currentTime = turnTimeRef.current;
           const nextTime = currentTime - 1;
           
-          if (nextTime < 0) {
-             // Timeout logic triggered inside interval to catch it exactly
+          // BUG FIX (Issue 9): 0 should not be displayed. 
+          // If nextTime is 0, we end the turn immediately instead of waiting for the next tick.
+          if (nextTime <= 0) {
+             setTurnTimeRemaining(0);
              endTurn('timeout');
           } else {
              setTurnTimeRemaining(nextTime);
-             // 10s warning
              if (nextTime === 10 && settings.soundEnabled) {
                 countdownAudioRef.current?.play().catch(e => console.warn(e));
              }
