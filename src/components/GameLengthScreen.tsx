@@ -8,14 +8,21 @@ interface GameLengthScreenProps {
   onPlay: (duration: GameDuration) => void;
 }
 
-const DURATIONS: GameDuration[] = [5, 10, 15];
+const DURATIONS: GameDuration[] = [3, 5, 7];
+
+const DURATION_LABELS: Record<GameDuration, string> = {
+  3: 'Short',
+  5: 'Regular',
+  7: 'Long'
+};
+
 
 export const GameLengthScreen: React.FC<GameLengthScreenProps> = ({
   players,
   onBack,
   onPlay,
 }) => {
-  const [selectedDuration, setSelectedDuration] = useState<GameDuration>(10);
+  const [selectedDuration, setSelectedDuration] = useState<GameDuration>(3);
 
   return (
     <div className="h-full w-full flex flex-col bg-scaffold-red text-white">
@@ -37,8 +44,12 @@ export const GameLengthScreen: React.FC<GameLengthScreenProps> = ({
                   : 'bg-black/20 text-white/70 hover:bg-black/30'}
               `}
             >
-              <span className="text-4xl font-bold leading-none">{dur}</span>
-              <span className="text-xs font-medium uppercase mt-1">mins</span>
+              {/* Show the Label (Short/Regular/Long) instead of the number */}
+              <span className="text-xl font-black uppercase tracking-tight">
+                {DURATION_LABELS[dur]}
+              </span>
+              {/* Optional: Tiny text showing the actual minutes for clarity */}
+              <span className="text-[10px] opacity-60 mt-1">{dur} MINS</span>
             </button>
           ))}
         </div>

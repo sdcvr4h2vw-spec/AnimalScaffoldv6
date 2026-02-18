@@ -8,7 +8,7 @@ export interface Player {
   name: string;
 }
 
-export type GameDuration = 5 | 10 | 15;
+export type GameDuration = 3 | 5 | 7;
 
 export type GameStatus = 'setup' | 'playing' | 'game_over_selection' | 'winner';
 
