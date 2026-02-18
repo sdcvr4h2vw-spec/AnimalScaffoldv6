@@ -237,8 +237,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const isTimeout = turnPhase === 'timeout';
 
     if (isTimeout) {
-        // Rule: Turn Failure (Timeout): Score -= 5.
-        pointsChange = -5;
+        // Rule: Turn Failure (Timeout): Score -= 10.
+        pointsChange = -10;
     } else if (fell) {
         // Rule: Turn Failure (Fall): Score -= 10.
         pointsChange = -10;
