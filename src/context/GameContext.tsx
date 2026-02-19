@@ -336,7 +336,6 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
           // BUG FIX (Issue 9): 0 should not be displayed. 
           // If nextTime is 0, we end the turn immediately instead of waiting for the next tick.
           if (nextTime <= 0) {
-             setTurnTimeRemaining(0);
              endTurn('timeout');
           } else {
              setTurnTimeRemaining(nextTime);
