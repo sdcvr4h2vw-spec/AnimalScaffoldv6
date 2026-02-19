@@ -1,115 +1,99 @@
-
 import { Instruction, InstructionType } from '../types';
 
-// Helper to get a random integer between min and max (inclusive)
-const getRandomInt = (min: number, max: number): number => {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-
-// --- RANDOMIZER HELPERS ---
-
-const getRandomOrientation = (): string => {
-  const rand = Math.random();
-  if (rand < 0.30) return 'horizontally';
-  if (rand < 0.60) return 'vertically';
-  return ''; // 40% blank (player choice)
-};
-
-const getRandomPlacement = (): string => {
-  const rand = Math.random();
-  if (rand < 0.10) return 'on your highest piece';
-  return 'on a different piece'; // 90%
-};
-
-// --- CARD GENERATORS ---
-
-const createBuildInstruction = (): Instruction => {
-  const pieces = getRandomInt(1, 4);
-  const orientation = getRandomOrientation();
+/**
+ * HELPER: Weighted Random Selection
+ */
+const getWeightedRandom = <T>(items: { value: T; weight: number }[]): T => {
+  const totalWeight = items.reduce((acc, item) => acc + item.weight, 0);
+  let random = Math.random() * totalWeight;
   
-  let text = `Build using ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}`;
-  if (orientation) {
-    text += ` positioned ${orientation}`;
+  for (const item of items) {
+    if (random < item.weight) return item.value;
+    random -= item.weight;
   }
-
-  return {
-    type: 'BUILD',
-    pieces,
-    text,
-    secondaryText: 'You may choose to play animals as pieces',
-    orientation
-  };
-};
-
-const createMoveInstruction = (): Instruction => {
-  const count = getRandomInt(1, 2);
-  const orientation = getRandomOrientation();
-  const placement = getRandomPlacement();
-
-  let text = `Move ${count} of your animals`;
-  if (orientation) text += ` positioning ${count === 1 ? 'it' : 'them'} ${orientation}`;
-  text += `, placing ${count === 1 ? 'it' : 'them'} ${placement}`;
-
-  return {
-    type: 'MOVE',
-    pieces: 1, // Logic treats as 1 piece for timer, but we hardcode 15s anyway
-    text,
-    secondaryText: 'If all your animals are in the pen, place a new one on a scaffold'
-  };
-};
-
-const createRemoveInstruction = (): Instruction => {
-  return {
-    type: 'REMOVE',
-    pieces: 1,
-    text: 'Take one of your animals back to the pen.',
-    secondaryText: 'If all your animals are in the pen, skip this turn'
-  };
+  return items[0].value;
 };
 
 /**
- * Generates a single instruction for Game Variant A.
- * @param turnCount - Current total turns taken
- * @param gameProgress - 0.0 to 1.0 representing percentage of game complete
+ * HELPER: Get Orientation Modifier
+ * 30% Horizontally, 30% Vertically, 40% Blank
  */
-export const generateInstruction = (
-  turnCount: number,
-  gameProgress: number
-): Instruction => {
+const getOrientation = (): string => {
+  const roll = Math.random() * 100;
+  if (roll < 30) return 'Horizontally';
+  if (roll < 60) return 'Vertically';
+  return ''; // Blank (player chooses)
+};
 
-  // Eligibility Check
-  const options: { type: InstructionType; weight: number }[] = [];
+/**
+ * HELPER: Get Placement Modifier
+ * 10% Highest piece, 90% Different piece
+ */
+const getPlacement = (): string => {
+  const roll = Math.random() * 100;
+  if (roll < 10) return 'on your highest piece';
+  return 'on a different piece';
+};
 
-  // 1. BUILD: Always available. Base Weight 70.
-  options.push({ type: 'BUILD', weight: 70 });
+export const generateInstruction = (totalTurns: number, progress: number): Instruction => {
+  // 1. Define the Pool of potential types
+  const pool: { type: InstructionType; weight: number }[] = [
+    { type: 'BUILD', weight: 80 }
+  ];
 
-  // 2. MOVE: Available after 3 turns. Base Weight 20.
-  if (turnCount >= 3) {
-    options.push({ type: 'MOVE', weight: 20 });
+  // 2. Add restricted cards if conditions are met
+  // Restriction: MOVE only after 5 total turns
+  if (totalTurns >= 5) {
+    pool.push({ type: 'MOVE', weight: 10 });
   }
 
-  // 3. REMOVE: Available after 50% time. Base Weight 10.
-  if (gameProgress > 0.5) {
-    options.push({ type: 'REMOVE', weight: 10 });
+  // Restriction: REMOVE only after 50% game progress
+  if (progress > 0.5) {
+    pool.push({ type: 'REMOVE', weight: 10 });
   }
 
-  // Select based on weights
-  const totalWeight = options.reduce((sum, opt) => sum + opt.weight, 0);
-  let random = Math.random() * totalWeight;
-  
-  let selectedType: InstructionType = 'BUILD';
-  for (const opt of options) {
-    if (random < opt.weight) {
-      selectedType = opt.type;
-      break;
-    }
-    random -= opt.weight;
-  }
+  // 3. Pick the type
+  const selectedType = getWeightedRandom(pool);
 
-  // Create Card
+  // 4. Build the specific instruction object
   switch (selectedType) {
-    case 'MOVE': return createMoveInstruction();
-    case 'REMOVE': return createRemoveInstruction();
-    default: return createBuildInstruction();
+    case 'MOVE': {
+      const orientation = getOrientation();
+      const orientationText = orientation ? ` positioning it ${orientation}` : '';
+      return {
+        type: 'MOVE',
+        text: `Move 1 of your animals${orientationText}`,
+        secondaryText: 'If all your animals are in the pen, place a new one on a scaffold',
+        pieces: 1 // For timer calculation
+      };
+    }
+
+    case 'REMOVE': {
+      return {
+        type: 'REMOVE',
+        text: 'Take one of your animals back to the pen.',
+        secondaryText: 'If all your animals are in the pen, skip this turn',
+        pieces: 1
+      };
+    }
+
+    case 'BUILD':
+    default: {
+      const pieces = Math.floor(Math.random() * 4) + 1; // 1-4 pieces
+      const orientation = getOrientation();
+      const placement = getPlacement();
+      
+      // Construct sentence: Build using [X] pieces [positioned orientation] [placement]
+      let text = `Build using ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}`;
+      if (orientation) text += ` positioned ${orientation}`;
+      text += ` ${placement}`;
+
+      return {
+        type: 'BUILD',
+        text: text,
+        secondaryText: 'You may choose to play animals as pieces',
+        pieces: pieces
+      };
+    }
   }
 };
