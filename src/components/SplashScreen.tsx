@@ -15,7 +15,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onPlay }) => {
   const BG_URL = "https://raw.githubusercontent.com/sdcvr4h2vw-spec/scaffold_assets/main/splash-bg.png";
 
   return (
-    <div className="relative h-full w-full flex flex-col items-center justify-between bg-gradient-to-b from-orange-400 via-pink-500 to-purple-900 overflow-hidden">
+    <div className="relative h-full w-full flex flex-col items-center justify-between bg-gradient-to-b from-orange-400 via-pink-500 to-[#BA4949] overflow-hidden">
       
       {/* Settings Icon - Top Right */}
       <div 
@@ -26,7 +26,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onPlay }) => {
       </div>
 
 {/* Cityscape Background Layer */}
-      <div className="absolute bottom-0 left-0 w-full h-[60vh] md:h-[500px] pointer-events-none z-0">
+      <div className="absolute bottom-50 left-0 w-full h-[90%] pointer-events-none z-0">
         <img
           src={BG_URL}
           alt="Cityscape"
