@@ -1,6 +1,6 @@
 export const ASSETS = {
-  LOGO: 'https://github.com/sdcvr4h2vw-spec/Game-images/blob/main/Scaffold_logo.png?raw=true',
-  CITYSCAPE: 'https://github.com/sdcvr4h2vw-spec/Game-images/blob/main/splash_background.png?raw=true',
+  LOGO: 'https://github.com/sdcvr4h2vw-spec/scaffold_assets/blob/main/animal-scaffold-logo.png?raw=true',
+  CITYSCAPE: 'https://github.com/sdcvr4h2vw-spec/scaffold_assets/blob/main/splash-bg.png?raw=true',
   TROPHY: 'https://github.com/sdcvr4h2vw-spec/Game-images/blob/main/trophy.png?raw=true',
 };
 
