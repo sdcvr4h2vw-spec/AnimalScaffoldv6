@@ -25,8 +25,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onPlay }) => {
         <Settings size={28} />
       </div>
 
-      {/* Cityscape Background Layer */}
-      <div className="absolute bottom-0 left-0 w-full h-[90%] pointer-events-none z-0">
+{/* Cityscape Background Layer - Fixed height for consistent cropping */}
+      <div className="absolute bottom-0 left-0 w-full h-[400px] pointer-events-none z-0">
         <img
           src={BG_URL}
           alt="Cityscape"
