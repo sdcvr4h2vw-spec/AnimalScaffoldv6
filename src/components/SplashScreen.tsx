@@ -34,7 +34,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onPlay }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full px-6 z-10 pt-40">
+      <div className="flex-1 flex flex-col items-center justify-center w-full px-6 z-10 pt-80">
         {/* Logo */}
         <div className="w-64 md:w-80 mb-4 animate-fade-in-down">
           <img 
