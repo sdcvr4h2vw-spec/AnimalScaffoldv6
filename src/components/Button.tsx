@@ -9,7 +9,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props 
 }) => {
   
-  const baseStyles = "relative font-bold text-lg uppercase tracking-wider py-4 px-6 rounded-lg transition-all active:top-[4px] active:shadow-none outline-none select-none flex items-center justify-center";
+  const baseStyles = "relative font-bold text-lg capitalize tracking-wider py-4 px-6 rounded-[10px] transition-all active:top-[4px] active:shadow-none outline-none select-none flex items-center justify-center";
   
   // Styles logic to match the high fidelity visual identity
   // Primary: Red/Rust with Dark Red Shadow (Used on Yellow screens)
