@@ -183,11 +183,32 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   // --- Turn Logic ---
 
   // 1. Start Turn
-  const startTurn = useCallback(() => {
+const startTurn = useCallback(() => {
     if (!activePlayer) return;
 
+    // --- iOS Audio Unlocker ---
+    // This "primes" the sounds during a user-initiated click so they can play automatically later
+    if (countdownAudioRef.current) {
+        countdownAudioRef.current.play().then(() => {
+            if (countdownAudioRef.current) {
+                countdownAudioRef.current.pause();
+                countdownAudioRef.current.currentTime = 0;
+            }
+        }).catch(() => { /* Silence autoplay restriction errors */ });
+    }
+    
+    const failAudio = audioCache.current[AUDIO_ASSETS.TIMEOUT_FAIL];
+    if (failAudio) {
+        failAudio.muted = true;
+        failAudio.play().then(() => {
+            failAudio.pause();
+            failAudio.muted = false;
+        }).catch(() => {});
+    }
+    // -------------------------
+
     playSound(AUDIO_ASSETS.START_TURN);
-    setIsGamePaused(false); // Game timer runs during instruction
+    setIsGamePaused(false); 
 
     // Generate Instruction
     const progress = 1 - (gameTimeRef.current / (duration * 60));
@@ -204,7 +225,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     const time = calculateTurnTime(instr.type, instr.pieces);
     setTurnTimeRemaining(time);
     
-    setTurnPhase('playing'); // Visible timer starts, game timer continues
+    setTurnPhase('playing'); 
 
     // Audio cue for short turns
     if (time <= 10 && settings.soundEnabled && countdownAudioRef.current) {
@@ -215,7 +236,8 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         }
     }
 
-  }, [activePlayer, duration, totalTurns, playSound, settings.gameVariant, settings.soundEnabled]);
+    // ADDED audioCache to the dependency list below to fix the error
+  }, [activePlayer, duration, totalTurns, playSound, settings.gameVariant, settings.soundEnabled, audioCache]);
 
 
   // 2. End Turn (Manual or Timeout)
