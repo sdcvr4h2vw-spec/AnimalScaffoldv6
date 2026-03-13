@@ -185,10 +185,10 @@ export const GameScreen: React.FC = () => {
                <div className="w-full bg-black/20 border-2 border-white/20 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-center backdrop-blur-md">
                   <p className="text-4xl font-bold text-white mb-4">Out of time!</p>
                   <p className="text-xl text-white/90 font-medium mb-4">
-                    Your highest animal must return to the pen.
+                    Step away from your scaffold…
                   </p>
                   <p className="text-sm text-white/70 italic">
-                    If you don't have any animals in play, your turn is complete.
+                    10 points deducted
                   </p>
                </div>
            </div>
