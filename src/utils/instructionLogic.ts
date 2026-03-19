@@ -27,26 +27,61 @@ const getOrientation = (): string => {
 
 /**
  * HELPER: Generate Mixed Build Text
- * Rolls orientation for each piece, caps horizontals at 2, and formats the grammar.
+ * Rolls orientation for each piece, caps horizontals at 2, and formats for quick reading.
  */
 const generateBuildText = (pieces: number): string => {
   let horizontals = 0;
   let verticals = 0;
-  let anys = 0;
 
   // Roll for each piece individually
   for (let i = 0; i < pieces; i++) {
     const roll = Math.random() * 100;
     
-    // Cap horizontals at 2. If it rolls horizontal but we are at the cap, it defaults to 'any'
+    // Cap horizontals at 2
     if (roll < 30 && horizontals < 2) {
       horizontals++;
     } else if (roll >= 30 && roll < 60) {
       verticals++;
-    } else {
-      anys++;
     }
   }
+
+  // 1. Edge Case: Single Piece
+  if (pieces === 1) {
+    if (horizontals === 1) return 'Build 1 piece horizontally.';
+    if (verticals === 1) return 'Build 1 piece vertically.';
+    return 'Build 1 piece.';
+  }
+
+  // 2. Edge Case: No Constraints Rolled
+  if (horizontals === 0 && verticals === 0) {
+    return `Build ${pieces} pieces.`;
+  }
+
+  // Build the constraint string (e.g., "1 horizontal", or "1 horizontal and 2 vertical")
+  const constraints = [];
+  if (horizontals > 0) constraints.push(`${horizontals} horizontal`);
+  if (verticals > 0) constraints.push(`${verticals} vertical`);
+  const constraintsString = constraints.join(' and ');
+
+  // 3. Fully Constrained (No remainder)
+  if (horizontals + verticals === pieces) {
+    // If they are all the exact same orientation
+    if (horizontals === pieces) return `Build ${pieces} pieces horizontally.`;
+    if (verticals === pieces) return `Build ${pieces} pieces vertically.`;
+    
+    // If they are mixed (e.g., 2 pieces: 1 horizontal and 1 vertical)
+    return `Build ${pieces} pieces: ${constraintsString}.`;
+  }
+
+  // 4. Partially Constrained (Remainder exists)
+  // If there are multiple constraints, but some pieces are left over (e.g., 4 pieces, 1H and 1V)
+  if (horizontals > 0 && verticals > 0) {
+    return `Build ${pieces} pieces, including ${constraintsString}.`;
+  }
+
+  // If there is only ONE type of constraint, and pieces are left over (e.g., 3 pieces, 2H)
+  return `Build ${pieces} pieces, including at least ${constraintsString}.`;
+};
 
   // Grammar for a single piece
   if (pieces === 1) {
