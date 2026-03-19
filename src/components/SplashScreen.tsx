@@ -14,7 +14,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onPlay }) => {
   const { setGameStatus } = useGameContext();
 
   return (
-    <div className="relative h-full w-full flex flex-col items-center justify-between bg-gradient-to-b from-orange-400 via-pink-500 to-purple-900 overflow-hidden">
+    <div className="relative h-full w-full flex flex-col items-center justify-between bg-[linear-gradient(to_bottom,#D4484B_0%,#EE6542_16%,#FF9A49_29%,#FFF100_50%,#FF6853_61%,#BA4949_100%)] overflow-hidden">
       
       {/* Settings Icon - Now Functional! */}
       <div 
@@ -34,7 +34,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onPlay }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full px-6 z-10 pt-40">
+      <div className="flex-1 flex flex-col items-center justify-center w-full px-6 z-10 pt-80">
         {/* Logo */}
         <div className="w-64 md:w-80 mb-4 animate-fade-in-down">
           <img 
